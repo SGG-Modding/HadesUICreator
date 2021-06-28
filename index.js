@@ -55,10 +55,15 @@ var tagBuildFunction = {
 //     "dialog" //(sub screens / modutil)  
 // ];
 
+var legalTagString = buildElementString();
+
 var outputString = "";
 var outputArr = [];
 
-var legalTagString = buildElementString();
+var numtextNodes = 0;
+
+var currentXPos = 0;
+var currentYPos = 0;
 
 function buildElementString() {
     let retString = "";
@@ -89,7 +94,7 @@ function updateHTML() {
 
 function BuildBaseScreen() {
     var tempOutput = `
-    function ShowHTMLScreen(usee)
+function ShowHTMLScreen()
         local screen = { Components = {} }
         screen.Name = "HTMLConverted"
 
@@ -109,7 +114,7 @@ function BuildBaseScreen() {
         PlaySound({ Name = "/SFX/Menu Sounds/ContractorMenuOpen" })
         local components = screen.Components
         
-        components.background = CreateScreenComponent({ Name = "rectangle01", Group = "Combat_UI_World" })
+        components.background = CreateScreenComponent({ Name = "rectangle01", Group = "HTML_Menu_Backing" })
         
         SetColor({ Id = components.background.Id, Color = {1, 1, 1, 0} })
         
@@ -120,7 +125,7 @@ function BuildBaseScreen() {
         HandleScreenInput( screen )
     end
     
-    function BuildElements(screen)
+function BuildElements(screen)
 	    local components = screen.Components
     end`;
     outputArr = tempOutput.split("\n");
@@ -135,22 +140,40 @@ function BuildText(node) {
     //get rid of the end at the end of BuildElements
     outputArr.pop();
 
+    //Calculate width and height
+
+    var fontSize = 25;
+    var width, height = calcTextDimensions(fontSize, node.innerText);
+    console.log(width, height);
+
+    if (numtextNodes == 0) {
+        currentYPos = fontSize;
+    }
+
     var tempOutput = `
-    CreateTextBox(MergeTables({ Id = components.background.Id, Text =` + node.innerHTML + `,
-        FontSize = 25,
-        OffsetX = 0, OffsetY = 0,
-        Width = 720,
-        Color = {0.988, 0.792, 0.247, 1},
-        Font = "AlegreyaSansSCBold",
-        ShadowBlur = 0, ShadowColor = {0,0,0,1}, ShadowOffset={0, 2},
-        Justification = "Left",
-    },LocalizationData.SellTraitScripts.ShopButton))`;
+        components["textBacking`+numtextNodes+`"] = CreateScreenComponent({ Name = "BlankObstacle", Group = "HTML_Menu", X = ` + currentXPos + `, Y = ` + currentYPos + `})
+        CreateTextBox(MergeTables({ Id = components["textBacking`+numtextNodes+`"].Id, Text = "` + node.innerHTML + `",
+            FontSize = 25,
+            OffsetX = 0, OffsetY = 0,
+            Width = 720,
+            Color = {0.988, 0.792, 0.247, 1},
+            Font = "AlegreyaSansSCBold",
+            ShadowBlur = 0, ShadowColor = {0,0,0,1}, ShadowOffset={0, 2},
+            Justification = "Left",
+        },LocalizationData.SellTraitScripts.ShopButton))`;
+
+    console.log(currentYPos);
+    console.log(height);
+    currentYPos = parseInt(height + currentYPos); 
+
+    numtextNodes ++;
+
     var splitOutput = tempOutput.split("\n");
 
     for (var i = 0; i < splitOutput.length; i++) {
         outputArr.push(splitOutput[i]);
     }
-    
+
     //Add the end back
     outputArr.push("end");
     BuildOutputString();
@@ -172,6 +195,28 @@ function getAllParentTags(node) {
     return els;
 }
 
+function calcTextDimensions(fontSize, text) {
+    var test = document.createElement("div");
+    document.body.appendChild(test);
+
+    test.style = `
+    position: absolute;
+    visibility: hidden;
+    height: auto;
+    width: auto;
+    white-space: nowrap;
+    `
+    test.style.fontSize = fontSize;
+
+    test.innerHTML = text;
+
+    var height = (test.clientHeight + 1 + fontSize);
+    var width = (test.clientWidth + 1 + fontSize);
+
+    test.remove();
+
+    return width, height;
+}
 
 /*
 function ShowCuisineScreen(usee)
