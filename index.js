@@ -1,37 +1,25 @@
 var inputHTML = "";
 
 //Simple proof of concept
-var legalTags = [
-    "html",
-    "body",
-    "div",
-    "p"
-];
-
-var tagBuildFunction = {
-    "html": null,
-    "body": BuildBaseScreen,
-    "div": BuildContainer,
-    "p": BuildText,
+var legalTags = {
+    "html": [null],
+    "body": [BuildBaseScreen],
+    "div": [BuildContainer],
+    "p": [BuildText, {"fontSize": 16}],
+    "h1": [BuildText, {"fontSize": 32}],
+    "h2": [BuildText, {"fontSize": 24}],
+    "h3": [BuildText, {"fontSize": 18.72}],
+    "h4": [BuildText, {"fontSize": 16}],
+    "h5": [BuildText, {"fontSize": 13.28}],
+    "h6": [BuildText, {"fontSize": 10.72}],
+    "button": [BuildButton, {"fontSize": 13.33}],
 };
 
-//For later, more complex, all feasible ones
-// var legalTags = [
-//     "html",
-//     "head",
-//     "body",
-//     "div",
-//     "p",
+//List of all feasible non finished tags
 //     "pre",
 //     "small",
 //     "span",
 //     "strong",
-//     "h1",
-//     "h2",
-//     "h3",
-//     "h4",
-//     "h5",
-//     "h6",
 //     "b",
 //     "br",
 //     "i",
@@ -53,23 +41,26 @@ var tagBuildFunction = {
 //     "datalist",// (drop downs)
 //     "option",
 //     "dialog" //(sub screens / modutil)  
-// ];
 
 var legalTagString = buildElementString();
 
 var outputString = "";
 var outputArr = [];
 
-var numtextNodes = 0;
+var numTextNodes = 0;
+var numButtonNodes = 0;
 
-var currentXPos = 0;
+var bodyMargin = 8;
+
+var currentXPos = bodyMargin;
 var currentYPos = 0;
 
 function buildElementString() {
     let retString = "";
-    for(var i = 0; i < legalTags.length; i++) {
-        retString += legalTags[i] + ", ";
-    }
+    Object.keys(legalTags)
+    .forEach(function eachKey(key) { 
+        retString += key + ", ";
+    });
     retString = retString.substring(0, retString.length - 2);
     return retString;
 }
@@ -83,9 +74,11 @@ function updateHTML() {
     htmlDoc.querySelectorAll(legalTagString).forEach(function(node) {
         let parents = getAllParentTags(node);
         if (parents.length != 0) {
-            if (parents.every(elem => legalTags.includes(elem.toLowerCase()))) {
-                if (tagBuildFunction[node.tagName.toLowerCase()] != null) {
-                    tagBuildFunction[node.tagName.toLowerCase()](node);
+            if (parents.every(elem => legalTags[elem.toLowerCase()] != null)) {
+                var tagBuild = legalTags[node.tagName.toLowerCase()];
+                if (tagBuild[0] != null) {
+                    console.log(tagBuild[1]);
+                    tagBuild[0](node, tagBuild[1]);
                 }
             }
         }
@@ -136,24 +129,24 @@ function BuildContainer(node) {
     console.log("container");
 }
 
-function BuildText(node) {
+//#region Text 
+function BuildText(node, args) {
     //get rid of the end at the end of BuildElements
     outputArr.pop();
 
     //Calculate width and height
 
-    var fontSize = 25;
+    var fontSize = args["fontSize"];
     var width, height = calcTextDimensions(fontSize, node.innerText);
-    console.log(width, height);
 
-    if (numtextNodes == 0) {
+    if (numTextNodes == 0) {
         currentYPos = fontSize;
     }
 
     var tempOutput = `
-        components["textBacking`+numtextNodes+`"] = CreateScreenComponent({ Name = "BlankObstacle", Group = "HTML_Menu", X = ` + currentXPos + `, Y = ` + currentYPos + `})
-        CreateTextBox(MergeTables({ Id = components["textBacking`+numtextNodes+`"].Id, Text = "` + node.innerHTML + `",
-            FontSize = 25,
+        components["textBacking`+numTextNodes+`"] = CreateScreenComponent({ Name = "BlankObstacle", Group = "HTML_Menu", X = ` + currentXPos + `, Y = ` + currentYPos + `})
+        CreateTextBox(MergeTables({ Id = components["textBacking`+numTextNodes+`"].Id, Text = "` + node.innerText + `",
+            FontSize = ` + fontSize + `,
             OffsetX = 0, OffsetY = 0,
             Width = 720,
             Color = {0.988, 0.792, 0.247, 1},
@@ -162,11 +155,9 @@ function BuildText(node) {
             Justification = "Left",
         },LocalizationData.SellTraitScripts.ShopButton))`;
 
-    console.log(currentYPos);
-    console.log(height);
     currentYPos = parseInt(height + currentYPos); 
 
-    numtextNodes ++;
+    numTextNodes ++;
 
     var splitOutput = tempOutput.split("\n");
 
@@ -176,6 +167,7 @@ function BuildText(node) {
 
     //Add the end back
     outputArr.push("end");
+
     BuildOutputString();
     console.log(outputString);
 }
@@ -195,9 +187,13 @@ function getAllParentTags(node) {
     return els;
 }
 
-function calcTextDimensions(fontSize, text) {
+function calcTextDimensions(fontSize, text, fontFamily) {
     var test = document.createElement("div");
     document.body.appendChild(test);
+
+    if (fontFamily == null) {
+        fontFamily = "Times New Roman";
+    }
 
     test.style = `
     position: absolute;
@@ -205,6 +201,7 @@ function calcTextDimensions(fontSize, text) {
     height: auto;
     width: auto;
     white-space: nowrap;
+    font-family: ` + fontFamily + `;
     `
     test.style.fontSize = fontSize;
 
@@ -218,35 +215,85 @@ function calcTextDimensions(fontSize, text) {
     return width, height;
 }
 
-/*
-function ShowCuisineScreen(usee)
-	local screen = { Components = {} }
-	screen.Name = "HTMLConverted"
+//#endregion
 
-	if IsScreenOpen( screen.Name ) then
-		return
-	end
-    OnScreenOpened({ Flag = screen.Name, PersistCombatUI = true })
-	FreezePlayerUnit()
+//#region Interactable
 
-	SetConfigOption({ Name = "FreeFormSelectWrapY", Value = false })
-	SetConfigOption({ Name = "FreeFormSelectStepDistance", Value = 8 })
-	SetConfigOption({ Name = "FreeFormSelectSuccessDistanceStep", Value = 8 })
-	SetConfigOption({ Name = "FreeFormSelectRepeatDelay", Value = 0.6 })
-	SetConfigOption({ Name = "FreeFormSelectRepeatInterval", Value = 0.1 })
-	SetConfigOption({ Name = "FreeFormSelecSearchFromId", Value = 0 })
+function BuildButton(node, args) {
+    //get rid of the end at the end of BuildElements
+    outputArr.pop();
 
-	PlaySound({ Name = "/SFX/Menu Sounds/ContractorMenuOpen" })
-	local components = screen.Components
-	
-	components.ShopBackground = CreateScreenComponent({ Name = "WellShopBackground", Group = "Combat_UI_World" })
-	components.ShopBackgroundDim = CreateScreenComponent({ Name = "rectangle01", Group = "Combat_UI_World" })
-	
-	SetColor({ Id = components.ShopBackgroundDim.Id, Color = {1, 1, 0, 0} })
-		
-	screen.KeepOpen = true
-	thread( HandleWASDInput, screen )
-	HandleScreenInput( screen )
+    var fontSize = args["fontSize"];
+    var width = calcButtonTextDimensions(fontSize, node.innerText)[0];
+    var height = calcButtonTextDimensions(fontSize, node.innerText)[1];
 
-end
-*/
+    console.log(width, height);
+
+    //BoonSlot1 dimensions 873 x 207
+    var xScale = parseInt(width) / 873;
+    var yScale = parseInt(height) / 207;
+
+    currentXPos = bodyMargin + width / 2;
+
+    //Dimensions / 2 + (average of lr padding - 1)
+    var offsetX = parseInt(calcTextDimensions(fontSize, node.innerText, "Arial")) / 2 + (6 - 1);
+
+    var tempOutput = `
+        components["button` + numButtonNodes + `"] = CreateScreenComponent({ Name = "BoonSlot1", Group = "HTML_Menu", Scale = 1, X = ` + currentXPos + `, Y = ` + currentYPos + ` });
+        SetScaleX({ Id = components["button` + numButtonNodes + `"].Id, Fraction = ` + xScale + `})
+        SetScaleY({ Id = components["button` + numButtonNodes + `"].Id, Fraction = ` + yScale + `})
+        CreateTextBox({Id = components["button` + numButtonNodes + `"].Id, Text = "` + node.innerText + `",
+            FontSize = ` + fontSize + `,
+            OffsetX = -` + offsetX + `, OffsetY = 0,
+            Width = 720,
+            Color = {0.988, 0.792, 0.247, 1},
+            Font = "AlegreyaSansSCBold",
+            ShadowBlur = 0, ShadowColor = {0,0,0,1}, ShadowOffset={0, 2},
+            Justification = "Left",
+        })`;
+
+    numButtonNodes ++;
+
+    currentXPos = bodyMargin;
+    currentYPos += 21;
+
+    var splitOutput = tempOutput.split("\n");
+    for (var i = 0; i < splitOutput.length; i++) {
+        outputArr.push(splitOutput[i]);
+    }
+
+    //Add the end back
+    outputArr.push("end");
+
+    BuildOutputString();
+    console.log(outputString);
+}
+
+function calcButtonTextDimensions(fontSize, text, fontFamily) {
+    var test = document.createElement("button");
+    document.body.appendChild(test);
+
+    if (fontFamily == null) {
+        fontFamily = "Arial";
+    }
+
+    test.style = `
+    position: absolute;
+    visibility: hidden;
+    font-family: ` + fontFamily + `;
+    `
+    test.style.fontSize = fontSize;
+
+    test.innerHTML = text;
+
+    var height = test.offsetHeight;
+    var width = test.offsetWidth;
+
+    console.log(width, height)
+
+    test.remove();
+
+    return [width, height];
+}
+
+//#endregion
