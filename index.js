@@ -47,6 +47,9 @@ var legalTagString = buildElementString();
 var outputString = "";
 var outputArr = [];
 
+var outputFunctionString = "";
+var outputFunctionArr = [];
+
 var numTextNodes = 0;
 var numButtonNodes = 0;
 
@@ -121,7 +124,30 @@ function ShowHTMLScreen()
 function BuildElements(screen)
 	    local components = screen.Components
     end`;
+    var tempFuncOutput = `
+function CloseHTMLScreen(screen, button)
+        DisableShopGamepadCursor()
+        SetConfigOption({ Name = "FreeFormSelectStepDistance", Value = 16 })
+        SetConfigOption({ Name = "FreeFormSelectSuccessDistanceStep", Value = 8 })
+        SetConfigOption({ Name = "FreeFormSelectRepeatDelay", Value = 0.0 })
+
+        PlaySound({ Name = "/SFX/Menu Sounds/ContractorMenuClose" })
+        CloseScreen( GetAllIds( screen.Components ) )
+
+        UnfreezePlayerUnit()
+        screen.KeepOpen = false
+        OnScreenClosed({ Flag = screen.Name })
+    end`
     outputArr = tempOutput.split("\n");
+    outputFunctionArr = tempFuncOutput.split("\n");
+}
+
+function BuildOutputString() {
+    var outputString = outputArr.join("\n");
+
+    var outputFunctionString = outputFunctionArr.join("\n");
+
+    return outputString + outputFunctionString;
 }
 
 function BuildContainer(node) {
@@ -168,12 +194,7 @@ function BuildText(node, args) {
     //Add the end back
     outputArr.push("end");
 
-    BuildOutputString();
-    console.log(outputString);
-}
-
-function BuildOutputString() {
-    outputString = outputArr.join("\n");
+    console.log(BuildOutputString());
 }
 
 function getAllParentTags(node) {
@@ -252,6 +273,23 @@ function BuildButton(node, args) {
             Justification = "Left",
         })`;
 
+    //build blank function for button click (complete js to lua interpreter may be impossible, at least for scope of project. But simple version may be later)
+    if (node.getAttribute("onclick") != null) {
+        var functionOutput = `
+function button` + numButtonNodes + `Func(screen, button)
+        DebugPrint({Text = "button` + numButtonNodes + `Func not implemented"})
+end`
+
+        var splitFuncOutput = functionOutput.split("\n");
+        for (var i = 0; i < splitFuncOutput.length; i++) {
+            outputFunctionArr.push(splitFuncOutput[i]);
+        }
+
+        //Add the on pressed call to the button
+        tempOutput +=`
+        components["button` + numButtonNodes + `"].OnPressedFunctionName = "button` + numButtonNodes + `Func"`;
+    }
+
     numButtonNodes ++;
 
     currentXPos = bodyMargin;
@@ -265,8 +303,7 @@ function BuildButton(node, args) {
     //Add the end back
     outputArr.push("end");
 
-    BuildOutputString();
-    console.log(outputString);
+    console.log(BuildOutputString());
 }
 
 function calcButtonTextDimensions(fontSize, text, fontFamily) {
